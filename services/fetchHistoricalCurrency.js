@@ -26,7 +26,7 @@ const formatDate = (date) => {
   return `${dd}%2F${mm}%2F${yyyy}`;
 };
 
-// TL formatını parse etme
+// Güncellenmiş TL formatını parse etme
 const parseTL = (tlString) => {
   if (typeof tlString !== 'string') {
     console.error('Girdi bir string olmalıdır.');
@@ -36,11 +36,14 @@ const parseTL = (tlString) => {
   // Boşlukları temizle
   let sanitized = tlString.trim();
 
-  // "TL", "₺" gibi sembolleri kaldır
-  sanitized = sanitized.replace(/[^0-9.,-]/g, '');
+  // Binlik ayırıcı olan noktaları kaldır
+  sanitized = sanitized.replace(/\./g, '');
 
-  // Virgülü noktaya çevir
+  // Ondalık virgülü noktaya çevir
   sanitized = sanitized.replace(/,/g, '.');
+
+  // Sadece rakam, nokta ve eksi işaretine izin ver
+  sanitized = sanitized.replace(/[^0-9.-]/g, '');
 
   // Sayıya dönüştür
   const number = parseFloat(sanitized);
@@ -83,7 +86,7 @@ const parseAndSaveData = async (html, type, date) => {
     rates.push(rate);
   });
 
-  console.log(rates);
+//   console.log(rates);
 
   // Veritabanına kaydetme
   for (const rate of rates) {
@@ -116,7 +119,7 @@ const getDateRange = (start, end) => {
 // VIEWSTATE değerini almak için
 const getViewState = async () => {
   try {
-    const response = await axios.get(process.env.HISTORY_CURRENCY_URL, {
+    const response = await axios.get('https://www.altinkaynak.com/Doviz/Kur', {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
@@ -148,7 +151,7 @@ const fetchHistoricalCurrencyRates = async () => {
       const viewState = await getViewState();
 
       const response = await axios.post(
-        process.env.HISTORY_CURRENCY_URL,
+        'https://www.altinkaynak.com/Doviz/Kur',
         `ctl00%24ctl00%24ScriptManager1=ctl00%24ctl00%24cphMain%24cphSubContent%24upValues%7Cctl00%24ctl00%24cphMain%24cphSubContent%24btnSearch&__EVENTTARGET=&__EVENTARGUMENT=&__VIEWSTATE=${encodeURIComponent(
           viewState
         )}&__VIEWSTATEGENERATOR=B6A93912&ctl00%24ctl00%24cphMain%24cphSubContent%24dateInput=${formattedDate}&ctl00%24ctl00%24cphMain%24cphSubContent%24wccRange%24CallbackState=&cphMain_cphSubContent_pcHintWS=0%3A0%3A-1%3A-10000%3A-10000%3A0%3A131px%3A86px%3A1&DXScript=1_42%2C1_75%2C10_2%2C10_1%2C1_68%2C1_65&__ASYNCPOST=true&ctl00%24ctl00%24cphMain%24cphSubContent%24btnSearch=Getir`,

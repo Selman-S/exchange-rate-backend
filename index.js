@@ -14,7 +14,7 @@ const fetchRates = require('./services/fetchRates');
 
 const app = express();
 const allowedOrigins = [
-  'https://exchange-rate-jet.vercel.app/', // Üretim frontend URL'si
+  'https://exchange-rate-jet.vercel.app', // Üretim frontend URL'si
   'http://localhost:3000', // Geliştirme frontend URL'si (React varsayılan portu 3000)
   // İhtiyaç duyarsanız başka origin'ler ekleyebilirsiniz
 ];

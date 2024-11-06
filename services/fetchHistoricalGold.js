@@ -8,7 +8,10 @@ require('dotenv').config();
 
 // Veritabanı bağlantısı
 mongoose
-  .connect(process.env.MONGODB_URI)
+  .connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
   .then(() => console.log('MongoDB bağlantısı başarılı'))
   .catch((err) => {
     console.error('MongoDB bağlantı hatası:', err);
@@ -23,7 +26,7 @@ const formatDate = (date) => {
   return `${dd}%2F${mm}%2F${yyyy}`;
 };
 
-// TL formatını parse etme
+// Güncellenmiş TL formatını parse etme
 const parseTL = (tlString) => {
   if (typeof tlString !== 'string') {
     console.error('Girdi bir string olmalıdır.');
@@ -33,11 +36,14 @@ const parseTL = (tlString) => {
   // Boşlukları temizle
   let sanitized = tlString.trim();
 
-  // "TL", "₺" gibi sembolleri kaldır
-  sanitized = sanitized.replace(/[^0-9.,-]/g, '');
+  // Binlik ayırıcı olan noktaları kaldır
+  sanitized = sanitized.replace(/\./g, '');
 
-  // Virgülü noktaya çevir
+  // Ondalık virgülü noktaya çevir
   sanitized = sanitized.replace(/,/g, '.');
+
+  // Sadece rakam, nokta ve eksi işaretine izin ver
+  sanitized = sanitized.replace(/[^0-9.-]/g, '');
 
   // Sayıya dönüştür
   const number = parseFloat(sanitized);
@@ -77,7 +83,8 @@ const parseAndSaveData = async (html, type, date) => {
 
     rates.push(rate);
   });
-// console.log(rates);
+
+//   console.log(rates);
 
   // Veritabanına kaydetme
   for (const rate of rates) {
@@ -107,72 +114,70 @@ const getDateRange = (start, end) => {
   return dateArray;
 };
 
-
 // VIEWSTATE değerini almak için
 const getViewState = async () => {
-    try {
-      const response = await axios.get(process.env.HISTORY_GOLD_URL, {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        },
-      });
-  
-      const $ = cheerio.load(response.data);
-      const viewState = $('input[name="__VIEWSTATE"]').val();
-      return viewState;
-    } catch (err) {
-      console.error('VIEWSTATE alınamadı:', err.message);
-      throw err;
-    }
-  };
-  
+  try {
+    const response = await axios.get('https://www.altinkaynak.com/Altin/Kur', {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      },
+    });
+
+    const $ = cheerio.load(response.data);
+    const viewState = $('input[name="__VIEWSTATE"]').val();
+    return viewState;
+  } catch (err) {
+    console.error('VIEWSTATE alınamadı:', err.message);
+    throw err;
+  }
+};
 
 // Ana fonksiyon
 const fetchHistoricalGoldRates = async () => {
-    const startDate = new Date('2023-01-01');
-    const endDate = new Date(); // Bugünün tarihi
-  
-    const dates = getDateRange(startDate, endDate);
-  
-    for (const date of dates) {
-      const formattedDate = formatDate(date);
-      console.log(`Fetching data for: ${date.toISOString().split('T')[0]}`);
-  
-      try {
-        const viewState = await getViewState();
-  
-        const response = await axios.post(
-          process.env.HISTORY_GOLD_URL,
-          `ctl00%24ctl00%24ScriptManager1=ctl00%24ctl00%24cphMain%24cphSubContent%24upValues%7Cctl00%24ctl00%24cphMain%24cphSubContent%24btnSearch&ctl00%24ctl00%24cphMain%24cphSubContent%24dateInput=${formattedDate}&ctl00%24ctl00%24cphMain%24cphSubContent%24wccRange%24CallbackState=&cphMain_cphSubContent_pcHintWS=0%3A0%3A-1%3A-10000%3A-10000%3A0%3A131px%3A86px%3A1&DXScript=1_42%2C1_75%2C10_2%2C10_1%2C1_68%2C1_65&__EVENTTARGET=&__EVENTARGUMENT=&__VIEWSTATE=${encodeURIComponent(
-            viewState
-          )}&__VIEWSTATEGENERATOR=AAA8014E&__ASYNCPOST=true&ctl00%24ctl00%24cphMain%24cphSubContent%24btnSearch=Getir`,
-          {
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-              'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-              Accept: '*/*',
-              'X-Requested-With': 'XMLHttpRequest',
-            },
-          }
-        );
-  
-        const html = response.data;
-        await parseAndSaveData(html, 'gold', date);
-      } catch (err) {
-        console.error(`Veri çekme hatası Tarih: ${date.toISOString().split('T')[0]}`, err.message);
-      }
-  
-      // Sunucuya aşırı yük binmemesi için kısa bir gecikme ekleyebilirsiniz
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // 1 saniye bekleme
+  const startDate = new Date('2023-01-01');
+//   const endDate = new Date('2023-01-03'); // Bugünün tarihi
+  const endDate = new Date(); // Bugünün tarihi
+
+  const dates = getDateRange(startDate, endDate);
+
+  for (const date of dates) {
+    const formattedDate = formatDate(date);
+    console.log(`Fetching data for: ${date.toISOString().split('T')[0]}`);
+
+    try {
+      const viewState = await getViewState();
+
+      const response = await axios.post(
+        'https://www.altinkaynak.com/Altin/Kur',
+        `ctl00%24ctl00%24ScriptManager1=ctl00%24ctl00%24cphMain%24cphSubContent%24upValues%7Cctl00%24ctl00%24cphMain%24cphSubContent%24btnSearch&ctl00%24ctl00%24cphMain%24cphSubContent%24dateInput=${formattedDate}&ctl00%24ctl00%24cphMain%24cphSubContent%24wccRange%24CallbackState=&cphMain_cphSubContent_pcHintWS=0%3A0%3A-1%3A-10000%3A-10000%3A0%3A131px%3A86px%3A1&DXScript=1_42%2C1_75%2C10_2%2C10_1%2C1_68%2C1_65&__EVENTTARGET=&__EVENTARGUMENT=&__VIEWSTATE=${encodeURIComponent(
+          viewState
+        )}&__VIEWSTATEGENERATOR=AAA8014E&__ASYNCPOST=true&ctl00%24ctl00%24cphMain%24cphSubContent%24btnSearch=Getir`,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+            Accept: '*/*',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        }
+      );
+
+      const html = response.data;
+      await parseAndSaveData(html, 'gold', date);
+    } catch (err) {
+      console.error(`Veri çekme hatası Tarih: ${date.toISOString().split('T')[0]}`, err.message);
     }
-  
-    console.log('Tüm veriler başarıyla çekildi ve kaydedildi');
-    mongoose.disconnect();
-  };
-  
+
+    // Sunucuya aşırı yük binmemesi için kısa bir gecikme ekleyebilirsiniz
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // 1 saniye bekleme
+  }
+
+  console.log('Tüm veriler başarıyla çekildi ve kaydedildi');
+  mongoose.disconnect();
+};
 
 // Betiği çalıştırma
 fetchHistoricalGoldRates();
