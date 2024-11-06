@@ -51,10 +51,34 @@ exports.getRates = async (req, res) => {
 
     if (type) query.type = type;
     if (name) query.name = name;
+
     if (startDate || endDate) {
       query.date = {};
       if (startDate) query.date.$gte = new Date(startDate);
       if (endDate) query.date.$lte = new Date(endDate);
+    } else {
+      // Eğer startDate ve endDate sağlanmamışsa, en son tarihli kayıtların tarihini bulalım
+      const latestRate = await Rate.findOne(query).sort({ date: -1 });
+      if (latestRate) {
+        const latestDate = latestRate.date;
+
+        // En son tarihin başlangıcını ve sonunu belirleyelim
+        const startOfDay = new Date(latestDate);
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const endOfDay = new Date(latestDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        // Query'ye date filtresi ekleyelim
+        query.date = { $gte: startOfDay, $lte: endOfDay };
+      } else {
+        // Hiç kayıt yoksa boş sonuç döndürelim
+        return res.status(200).json({
+          success: true,
+          count: 0,
+          data: [],
+        });
+      }
     }
 
     const rates = await Rate.find(query).sort({ date: -1 });
@@ -68,3 +92,4 @@ exports.getRates = async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 };
+
