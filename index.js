@@ -13,10 +13,33 @@ const rateRoutes = require('./routes/rateRoutes');
 const fetchRates = require('./services/fetchRates');
 
 const app = express();
+const allowedOrigins = [
+  'https://exchange-rate-jet.vercel.app/', // Üretim frontend URL'si
+  'http://localhost:3000', // Geliştirme frontend URL'si (React varsayılan portu 3000)
+  // İhtiyaç duyarsanız başka origin'ler ekleyebilirsiniz
+];
+
+// CORS Ayarları
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Origin boşsa (örneğin, sunucuya doğrudan yapılan istekler için) izin ver
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS policy hatası: Bu origin izin verilmiyor.'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // İzin verilecek HTTP metodları
+  allowedHeaders: ['Content-Type', 'Authorization'], // İzin verilecek header'lar
+  credentials: true, // Çerezleri dahil etmek istiyorsanız
+};
 
 // Middleware
 app.use(express.json());
-app.use(cors());
+app.use(cors(corsOptions));
+
+
 // Veritabanı Bağlantısı
 mongoose
 .connect(process.env.MONGODB_URI)
@@ -27,7 +50,7 @@ mongoose
 swaggerDocs(app);
 
 // Veri çekme işlemini başlatma (uygulama ilk çalıştığında)
-  // fetchRates();
+  //  fetchRates();
 
 // Cron job tanımlama
 cron.schedule(process.env.FETCH_TIME, () => {
