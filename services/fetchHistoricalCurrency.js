@@ -9,10 +9,7 @@ require('dotenv').config();
 
 // Veritabanı bağlantısı
 mongoose
-  .connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB bağlantısı başarılı'))
   .catch((err) => {
     console.error('MongoDB bağlantı hatası:', err);
@@ -163,7 +160,7 @@ const getViewState = async () => {
 
 // Ana fonksiyon
 exports.fetchHistoricalCurrencyRates = async () => {
-  const startDate = new Date('2021-10-21'); // Başlangıç tarihini ihtiyaçlarınıza göre ayarlayın
+  const startDate = new Date('2022-01-01'); // Başlangıç tarihini ihtiyaçlarınıza göre ayarlayın
   const endDate = new Date(); // Bugünün tarihi
 
   const dates = getDateRange(startDate, endDate);
