@@ -5,25 +5,19 @@ const cheerio = require('cheerio');
 const Rate = require('../models/Rate');
 require('dotenv').config();
 
-
 const fetchRates = async () => {
   try {
-    
     // Altın fiyatlarını çekme
     const goldResponse = await axios.get(process.env.GOLD_URL);
     await parseAndSaveData(goldResponse.data, 'gold');
-    // console.log(goldResponse);
-    
-    
+
     // Döviz kurlarını çekme
     const currencyResponse = await axios.get(process.env.CURRENCY_URL);
     await parseAndSaveData(currencyResponse.data, 'currency');
-    
-  
 
     console.log('Veriler başarıyla çekildi ve kaydedildi');
   } catch (error) {
-     console.error('Veri çekme hatası:', error);
+    console.error('Veri çekme hatası:', error);
   }
 };
 
@@ -39,13 +33,6 @@ function parseTL(tlString) {
   // "TL", "₺" gibi sembolleri kaldır
   sanitized = sanitized.replace(/[^0-9.,-]/g, '');
 
-  // Çoklu nokta kullanımını kontrol et ve ilk noktayı koruyarak diğerlerini kaldır
-  const parts = sanitized.split(',');
-  if (parts.length > 2) {
-    console.error('Geçersiz format: Birden fazla virgül içeriyor.');
-    return null;
-  }
-
   // Binlik ayırıcıları kaldırmak için noktaları kaldır
   sanitized = sanitized.replace(/\./g, '');
 
@@ -56,7 +43,7 @@ function parseTL(tlString) {
   const number = parseFloat(sanitized);
 
   if (isNaN(number)) {
-    console.error('Dönüştürülemeyen sayı.');
+    console.error('Dönüştürülemeyen sayı:', tlString);
     return null;
   }
 
@@ -71,59 +58,72 @@ const parseAndSaveData = async (html, type) => {
   $('.table tbody tr').each((index, element) => {
     let name;
     if (type === 'gold') {
-  
-       name = $(element).find('td:nth-child(1)').text().trim();
-      
-    }else if (type === 'currency') {
+      name = $(element).find('td:nth-child(1)').text().trim();
+    } else if (type === 'currency') {
       name = $(element).find('td:nth-child(1) h5').text().trim();
     }
-      if (name === '') {
-        return;
-        
-      }
+    if (name === '') {
+      return;
+    }
 
-  
     const buyPrice = parseTL($(element).find('[id$="Buy"]').text());
     const sellPrice = parseTL($(element).find('[id$="Sell"]').text());
 
+    if (buyPrice === null || sellPrice === null) {
+      console.error(`Fiyat parse edilemedi: ${name}`);
+      return;
+    }
 
-    // Yeni bir Rate nesnesi oluşturma
-    const rate = new Rate({
+    const rate = {
       type,
       name,
       buyPrice,
       sellPrice,
-      date: new Date(), // Bugünün tarihi
-    });
+      date: new Date(), // Bugünün tarihi ve saati
+    };
     rates.push(rate);
   });
 
+  // Bugünün başlangıcı ve sonunu belirleme
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
 
-  // Veritabanına kaydetme
-  for (const rate of rates) {
-    const rateData = rate.toObject();
-    delete rateData._id; // _id alanını çıkarıyoruz
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
 
+  // Veritabanına kaydetme (bulkWrite kullanarak)
+  if (rates.length > 0) {
+    const bulkOps = rates.map((rate) => {
+      return {
+        updateOne: {
+          filter: {
+            type: rate.type,
+            name: rate.name,
+            date: { $gte: todayStart, $lte: todayEnd },
+          },
+          update: {
+            $set: {
+              buyPrice: rate.buyPrice,
+              sellPrice: rate.sellPrice,
+              date: rate.date,
+            },
+          },
+          upsert: true, // Kayıt yoksa oluştur
+        },
+      };
+    });
 
-    await Rate.findOneAndUpdate(
-      { type: rate.type, name: rate.name, date: { $gte: startOfToday(), $lte: endOfToday() } },
-      rateData,
-      { upsert: true, new: true }
-    );
+    try {
+      const bulkWriteResult = await Rate.bulkWrite(bulkOps);
+      console.log(
+        `Bulk write tamamlandı. Matched: ${bulkWriteResult.matchedCount}, Upserted: ${bulkWriteResult.upsertedCount}`
+      );
+    } catch (err) {
+      console.error('Bulk write sırasında hata oluştu:', err);
+    }
+  } else {
+    console.log('Kaydedilecek veri bulunamadı.');
   }
-};
-
-// Yardımcı fonksiyonlar
-const startOfToday = () => {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  return now;
-};
-
-const endOfToday = () => {
-  const now = new Date();
-  now.setHours(23, 59, 59, 999);
-  return now;
 };
 
 module.exports = fetchRates;
