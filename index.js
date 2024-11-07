@@ -17,7 +17,7 @@ const {
 }= require('./services/fetchHistoricalCurrency');
 
 
-//  fetchHistoricalGoldRates()
+ fetchHistoricalGoldRates()
  fetchHistoricalCurrencyRates()
 const app = express();
 const allowedOrigins = [
