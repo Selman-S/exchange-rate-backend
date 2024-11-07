@@ -4,6 +4,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const mongoose = require('mongoose');
 const Rate = require('../models/Rate'); // Rate modelinin doğru yolu
+const moment = require('moment-timezone');
 require('dotenv').config();
 
 // Veritabanı bağlantısı
@@ -73,31 +74,56 @@ const parseAndSaveData = async (html, type, date) => {
       return;
     }
 
+    // Türkiye saat diliminde tarih oluşturma
+    const dateInTurkey = moment(date).tz('Europe/Istanbul').startOf('day').toDate();
+
     const rate = {
       type: type, // 'gold'
       name: name,
       buyPrice: buyPrice,
       sellPrice: sellPrice,
-      date: date,
+      date: dateInTurkey,
     };
 
     rates.push(rate);
   });
 
-//   console.log(rates);
+  // İlgili tarihin başlangıcı ve sonunu belirleme
+  const startOfDay = moment(date).tz('Europe/Istanbul').startOf('day').toDate();
+  const endOfDay = moment(date).tz('Europe/Istanbul').endOf('day').toDate();
 
-  // Veritabanına kaydetme
-  for (const rate of rates) {
+  // Veritabanına kaydetme (bulkWrite kullanarak)
+  if (rates.length > 0) {
+    const bulkOps = rates.map((rate) => {
+      return {
+        updateOne: {
+          filter: {
+            type: rate.type,
+            name: rate.name,
+            date: { $gte: startOfDay, $lte: endOfDay },
+          },
+          update: {
+            $set: {
+              buyPrice: rate.buyPrice,
+              sellPrice: rate.sellPrice,
+              date: rate.date,
+            },
+          },
+          upsert: true, // Kayıt yoksa oluştur
+        },
+      };
+    });
+
     try {
-      await Rate.findOneAndUpdate(
-        { type: rate.type, name: rate.name, date: rate.date },
-        rate,
-        { upsert: true, new: true }
+      const bulkWriteResult = await Rate.bulkWrite(bulkOps);
+      console.log(
+        `Bulk write tamamlandı. Matched: ${bulkWriteResult.matchedCount}, Upserted: ${bulkWriteResult.upsertedCount}`
       );
-      console.log(`Kaydedildi: ${rate.name} Tarih: ${rate.date.toISOString().split('T')[0]}`);
     } catch (err) {
-      console.error(`Veritabanına kaydedilemedi: ${rate.name} Tarih: ${rate.date.toISOString().split('T')[0]}`, err);
+      console.error('Bulk write sırasında hata oluştu:', err);
     }
+  } else {
+    console.log('Kaydedilecek veri bulunamadı.');
   }
 };
 
@@ -121,7 +147,8 @@ const getViewState = async () => {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        Accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
       },
     });
 
@@ -137,14 +164,14 @@ const getViewState = async () => {
 // Ana fonksiyon
 const fetchHistoricalGoldRates = async () => {
   const startDate = new Date('2013-01-01');
-  const endDate = new Date('2023-01-01'); // Bugünün tarihi
-//   const endDate = new Date(); // Bugünün tarihi
+  const endDate = new Date('2023-01-01'); // İhtiyacınıza göre ayarlayın
+  // const endDate = new Date(); // Bugünün tarihi
 
   const dates = getDateRange(startDate, endDate);
 
   for (const date of dates) {
     const formattedDate = formatDate(date);
-    console.log(`Fetching data for: ${date.toISOString().split('T')[0]}`);
+    console.log(`Veri çekiliyor: ${moment(date).format('YYYY-MM-DD')}`);
 
     try {
       const viewState = await getViewState();
@@ -168,7 +195,10 @@ const fetchHistoricalGoldRates = async () => {
       const html = response.data;
       await parseAndSaveData(html, 'gold', date);
     } catch (err) {
-      console.error(`Veri çekme hatası Tarih: ${date.toISOString().split('T')[0]}`, err.message);
+      console.error(
+        `Veri çekme hatası Tarih: ${moment(date).format('YYYY-MM-DD')}`,
+        err.message
+      );
     }
 
     // Sunucuya aşırı yük binmemesi için kısa bir gecikme ekleyebilirsiniz

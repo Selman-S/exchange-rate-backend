@@ -4,6 +4,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const mongoose = require('mongoose');
 const Rate = require('../models/Rate'); // Rate modelinin doğru yolu
+const moment = require('moment-timezone');
 require('dotenv').config();
 
 // Veritabanı bağlantısı
@@ -64,42 +65,66 @@ const parseAndSaveData = async (html, type, date) => {
   $('.table tbody tr').each((index, element) => {
     const code = $(element).find('span.code').text().trim(); // Para birimi kodu (örn: USD)
     const name = $(element).find('h5').text().trim(); // Para birimi adı (örn: Amerikan Doları)
-    
+
     if (code === '') return; // Boş kodları atla
 
     const buyPrice = parseTL($(element).find('td:nth-child(3)').text());
     const sellPrice = parseTL($(element).find('td:nth-child(4)').text());
 
     if (buyPrice === null || sellPrice === null) {
-      console.error(`Fiyat parse edilemedi: ${code} Tarih: ${date}`);
+      console.error(`Fiyat parse edilemedi: ${code} Tarih: ${moment(date).format('YYYY-MM-DD')}`);
       return;
     }
 
+    // Türkiye saat diliminde tarih oluşturma (Günün başlangıcı)
+    const dateInTurkey = moment(date).tz('Europe/Istanbul').startOf('day').toDate();
+
     const rate = {
-      type: type, // 'currency'
-      name: code, // 'USD', 'EUR' vb.
-      buyPrice: buyPrice,
-      sellPrice: sellPrice,
-      date: date,
+      type, // 'currency'
+      name, // Para birimi adı
+      buyPrice,
+      sellPrice,
+      date: dateInTurkey, // Türkiye saati ile günün başlangıcı
     };
 
     rates.push(rate);
   });
 
-  //  console.log(rates);
+  // İlgili tarihin başlangıcı ve sonunu belirleme (Türkiye saat diliminde)
+  const startOfDay = moment(date).tz('Europe/Istanbul').startOf('day').toDate();
+  const endOfDay = moment(date).tz('Europe/Istanbul').endOf('day').toDate();
 
-  // Veritabanına kaydetme
-  for (const rate of rates) {
+  // Veritabanına kaydetme (bulkWrite kullanarak)
+  if (rates.length > 0) {
+    const bulkOps = rates.map((rate) => ({
+      updateOne: {
+        filter: {
+          type: rate.type,
+          name: rate.name,
+          date: { $gte: startOfDay, $lte: endOfDay },
+        },
+        update: {
+          $set: {
+            buyPrice: rate.buyPrice,
+            sellPrice: rate.sellPrice,
+            date: rate.date,
+          },
+        },
+        upsert: true, // Kayıt yoksa oluştur
+      },
+    }));
+console.log(rates);
+
     try {
-      await Rate.findOneAndUpdate(
-        { type: rate.type, name: rate.name, date: rate.date },
-        rate,
-        { upsert: true, new: true }
+      const bulkWriteResult = await Rate.bulkWrite(bulkOps);
+      console.log(
+        `Bulk write tamamlandı. Matched: ${bulkWriteResult.matchedCount}, Upserted: ${bulkWriteResult.upsertedCount}`
       );
-      console.log(`Kaydedildi: ${rate.name} Tarih: ${rate.date.toISOString().split('T')[0]}`);
     } catch (err) {
-      console.error(`Veritabanına kaydedilemedi: ${rate.name} Tarih: ${rate.date.toISOString().split('T')[0]}`, err);
+      console.error('Bulk write sırasında hata oluştu:', err);
     }
+  } else {
+    console.log('Kaydedilecek veri bulunamadı.');
   }
 };
 
@@ -138,14 +163,14 @@ const getViewState = async () => {
 
 // Ana fonksiyon
 const fetchHistoricalCurrencyRates = async () => {
-  const startDate = new Date('2024-02-01');
+  const startDate = new Date('2024-11-07'); // Başlangıç tarihini ihtiyaçlarınıza göre ayarlayın
   const endDate = new Date(); // Bugünün tarihi
 
   const dates = getDateRange(startDate, endDate);
 
   for (const date of dates) {
     const formattedDate = formatDate(date);
-    console.log(`Fetching data for: ${date.toISOString().split('T')[0]}`);
+    console.log(`Veri çekiliyor: ${moment(date).format('YYYY-MM-DD')}`);
 
     try {
       const viewState = await getViewState();
@@ -169,7 +194,10 @@ const fetchHistoricalCurrencyRates = async () => {
       const html = response.data;
       await parseAndSaveData(html, 'currency', date);
     } catch (err) {
-      console.error(`Veri çekme hatası Tarih: ${date.toISOString().split('T')[0]}`, err.message);
+      console.error(
+        `Veri çekme hatası Tarih: ${moment(date).format('YYYY-MM-DD')}`,
+        err.message
+      );
     }
 
     // Sunucuya aşırı yük binmemesi için kısa bir gecikme ekleyebilirsiniz

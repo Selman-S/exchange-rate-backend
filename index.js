@@ -50,7 +50,8 @@ mongoose
 swaggerDocs(app);
 
 // Veri çekme işlemini başlatma (uygulama ilk çalıştığında)
-   fetchRates();
+    //  fetchRates();
+
 
 // Cron job tanımlama
 cron.schedule(process.env.FETCH_TIME, () => {

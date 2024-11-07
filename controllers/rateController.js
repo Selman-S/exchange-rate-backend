@@ -46,6 +46,7 @@ exports.getAssetNamesByType = async (req, res, next) => {
 exports.getRates = async (req, res) => {
   try {
     const { type, name, startDate, endDate } = req.query;
+console.log(req.query);
 
     let query = {};
 
