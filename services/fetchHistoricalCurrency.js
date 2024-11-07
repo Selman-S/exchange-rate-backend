@@ -163,7 +163,7 @@ const getViewState = async () => {
 
 // Ana fonksiyon
 exports.fetchHistoricalCurrencyRates = async () => {
-  const startDate = new Date('2012-01-01'); // Başlangıç tarihini ihtiyaçlarınıza göre ayarlayın
+  const startDate = new Date('2020-01-01'); // Başlangıç tarihini ihtiyaçlarınıza göre ayarlayın
   const endDate = new Date(); // Bugünün tarihi
 
   const dates = getDateRange(startDate, endDate);
