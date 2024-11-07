@@ -86,7 +86,7 @@ const parseAndSaveData = async (html, type, date) => {
     rates.push(rate);
   });
 
-//   console.log(rates);
+  //  console.log(rates);
 
   // Veritabanına kaydetme
   for (const rate of rates) {
@@ -138,7 +138,7 @@ const getViewState = async () => {
 
 // Ana fonksiyon
 const fetchHistoricalCurrencyRates = async () => {
-  const startDate = new Date('2023-01-01');
+  const startDate = new Date('2024-02-01');
   const endDate = new Date(); // Bugünün tarihi
 
   const dates = getDateRange(startDate, endDate);

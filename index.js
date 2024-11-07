@@ -56,6 +56,9 @@ swaggerDocs(app);
 cron.schedule(process.env.FETCH_TIME, () => {
   console.log('Cron job çalıştı:', new Date());
   fetchRates();
+},{
+  scheduled: true,
+  timezone: "Europe/Istanbul"
 });
 
 
