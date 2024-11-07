@@ -113,7 +113,7 @@ const parseAndSaveData = async (html, type, date) => {
         upsert: true, // Kayıt yoksa oluştur
       },
     }));
-console.log(rates);
+// console.log(rates);
 
     try {
       const bulkWriteResult = await Rate.bulkWrite(bulkOps);
@@ -162,8 +162,8 @@ const getViewState = async () => {
 };
 
 // Ana fonksiyon
-const fetchHistoricalCurrencyRates = async () => {
-  const startDate = new Date('2024-11-01'); // Başlangıç tarihini ihtiyaçlarınıza göre ayarlayın
+exports.fetchHistoricalCurrencyRates = async () => {
+  const startDate = new Date('2012-01-01'); // Başlangıç tarihini ihtiyaçlarınıza göre ayarlayın
   const endDate = new Date(); // Bugünün tarihi
 
   const dates = getDateRange(startDate, endDate);
@@ -209,4 +209,4 @@ const fetchHistoricalCurrencyRates = async () => {
 };
 
 // Betiği çalıştırma
-fetchHistoricalCurrencyRates();
+// fetchHistoricalCurrencyRates();

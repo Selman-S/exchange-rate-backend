@@ -9,9 +9,16 @@ const swaggerDocs = require('./swagger');
 const authRoutes = require('./routes/auth');
 const portfolioRoutes = require('./routes/portfolioRoutes');
 const rateRoutes = require('./routes/rateRoutes');
+const {
+  fetchHistoricalGoldRates
+}= require('./services/fetchHistoricalGold');
+const {
+  fetchHistoricalCurrencyRates
+}= require('./services/fetchHistoricalCurrency');
 
-const fetchRates = require('./services/fetchRates');
-
+console.log('fetchHistoricalCurrencyRates', fetchHistoricalCurrencyRates);
+ fetchHistoricalGoldRates()
+ fetchHistoricalCurrencyRates()
 const app = express();
 const allowedOrigins = [
   'https://exchange-rate-jet.vercel.app', // Üretim frontend URL'si

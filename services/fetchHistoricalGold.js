@@ -162,8 +162,8 @@ const getViewState = async () => {
 };
 
 // Ana fonksiyon
-const fetchHistoricalGoldRates = async () => {
-  const startDate = new Date('2024-11-01');
+exports.fetchHistoricalGoldRates = async () => {
+  const startDate = new Date('2012-01-01');
   // const endDate = new Date('2023-01-01'); // İhtiyacınıza göre ayarlayın
   const endDate = new Date(); // Bugünün tarihi
 
@@ -210,4 +210,4 @@ const fetchHistoricalGoldRates = async () => {
 };
 
 // Betiği çalıştırma
-fetchHistoricalGoldRates();
+// fetchHistoricalGoldRates();
