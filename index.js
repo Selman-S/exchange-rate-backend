@@ -17,8 +17,8 @@ const {
 }= require('./services/fetchHistoricalCurrency');
 
 
- fetchHistoricalGoldRates()
- fetchHistoricalCurrencyRates()
+//  fetchHistoricalGoldRates()
+//  fetchHistoricalCurrencyRates()
 const app = express();
 const allowedOrigins = [
   'https://exchange-rate-jet.vercel.app', // Üretim frontend URL'si
