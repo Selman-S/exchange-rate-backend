@@ -5,7 +5,6 @@ const cors = require('cors');
 const cron = require('node-cron');
 const swaggerDocs = require('./swagger');
 
-
 const authRoutes = require('./routes/auth');
 const portfolioRoutes = require('./routes/portfolioRoutes');
 const rateRoutes = require('./routes/rateRoutes');
