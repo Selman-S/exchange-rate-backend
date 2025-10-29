@@ -14,6 +14,7 @@ const {
 const {
   fetchHistoricalCurrencyRates
 }= require('./services/fetchHistoricalCurrency');
+const fetchRates = require('./services/fetchRates');
 
 
 //  fetchHistoricalGoldRates()
@@ -56,12 +57,14 @@ mongoose
 swaggerDocs(app);
 
 // Veri çekme işlemini başlatma (uygulama ilk çalıştığında)
-    //  fetchRates();
+// fetchRates();
 
 
-// Cron job tanımlama
-cron.schedule(process.env.FETCH_TIME, () => {
-  console.log('Cron job çalıştı:', new Date());
+// Cron job tanımlama - Her saat başında çalışır (24/7)
+cron.schedule('0 * * * *', () => {
+  console.log('========================================');
+  console.log('🔄 Cron job çalıştı:', new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' }));
+  console.log('========================================');
   fetchRates();
 },{
   scheduled: true,

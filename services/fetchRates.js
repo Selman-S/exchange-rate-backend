@@ -97,6 +97,15 @@ const parseAndSaveData = async (html, type) => {
 
   // Veritabanına kaydetme (bulkWrite kullanarak)
   if (rates.length > 0) {
+    console.log(`\n📊 ${type.toUpperCase()} - Toplam ${rates.length} veri çekildi:`);
+    // İlk 3 veriyi örnek olarak göster
+    rates.slice(0, 3).forEach(rate => {
+      console.log(`  • ${rate.name}: Alış=${rate.buyPrice.toFixed(2)} TL, Satış=${rate.sellPrice.toFixed(2)} TL`);
+    });
+    if (rates.length > 3) {
+      console.log(`  ... ve ${rates.length - 3} veri daha`);
+    }
+
     const bulkOps = rates.map((rate) => ({
       updateOne: {
         filter: {
@@ -118,13 +127,13 @@ const parseAndSaveData = async (html, type) => {
     try {
       const bulkWriteResult = await Rate.bulkWrite(bulkOps);
       console.log(
-        `Bulk write tamamlandı. Matched: ${bulkWriteResult.matchedCount}, Upserted: ${bulkWriteResult.upsertedCount}`
+        `✅ ${type.toUpperCase()} - Veritabanına kaydedildi. Güncellenen: ${bulkWriteResult.matchedCount}, Yeni: ${bulkWriteResult.upsertedCount}\n`
       );
     } catch (err) {
-      console.error('Bulk write sırasında hata oluştu:', err);
+      console.error(`❌ ${type.toUpperCase()} - Bulk write sırasında hata oluştu:`, err);
     }
   } else {
-    console.log('Kaydedilecek veri bulunamadı.');
+    console.log(`⚠️  ${type.toUpperCase()} - Kaydedilecek veri bulunamadı.`);
   }
 };
 
@@ -164,17 +173,24 @@ const getViewState = async () => {
 // Ana fonksiyon
 const fetchRates = async () => {
   try {
+    console.log('\n🚀 Veri çekme işlemi başlıyor...');
+    console.log('⏰ Zaman:', moment().tz('Europe/Istanbul').format('DD.MM.YYYY HH:mm:ss'));
+    
     // Altın fiyatlarını çekme
+    console.log('\n🥇 Altın fiyatları çekiliyor...');
     const goldResponse = await axios.get(process.env.GOLD_URL);
     await parseAndSaveData(goldResponse.data, 'gold');
 
     // Döviz kurlarını çekme
+    console.log('💱 Döviz kurları çekiliyor...');
     const currencyResponse = await axios.get(process.env.CURRENCY_URL);
     await parseAndSaveData(currencyResponse.data, 'currency');
 
-    console.log('Veriler başarıyla çekildi ve kaydedildi');
+    console.log('✨ Tüm veriler başarıyla çekildi ve kaydedildi!');
+    console.log('========================================\n');
   } catch (error) {
-    console.error('Veri çekme hatası:', error);
+    console.error('❌ Veri çekme hatası:', error.message);
+    console.log('========================================\n');
   }
 };
 

@@ -42,6 +42,86 @@ exports.getAssetNamesByType = async (req, res, next) => {
 
 
 
+// @desc    Belirli bir tarihteki fiyatı getir
+// @route   GET /api/rates/price-at
+// @access  Public
+exports.getPriceAtDate = async (req, res) => {
+  try {
+    const { type, name, date } = req.query;
+
+    // Validasyon
+    if (!type || !name || !date) {
+      return res.status(400).json({
+        success: false,
+        error: 'type, name ve date parametreleri gerekli'
+      });
+    }
+
+    const requestedDate = new Date(date);
+    
+    // Geçersiz tarih kontrolü
+    if (isNaN(requestedDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        error: 'Geçersiz tarih formatı. YYYY-MM-DD formatında olmalı'
+      });
+    }
+    
+    // Gelecek tarih kontrolü
+    if (requestedDate > new Date()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Gelecek tarih için veri sorgulanamaz'
+      });
+    }
+
+    // Belirtilen tarihte veya öncesinde en yakın fiyatı bul
+    const rate = await Rate.findOne({
+      type,
+      name,
+      date: { $lte: requestedDate }
+    }).sort({ date: -1 });
+
+    if (!rate) {
+      return res.status(404).json({
+        success: false,
+        error: 'Belirtilen tarih aralığında veri bulunamadı'
+      });
+    }
+
+    // Tarih tam eşleşme mi?
+    const rateDate = new Date(rate.date);
+    rateDate.setHours(0, 0, 0, 0);
+    requestedDate.setHours(0, 0, 0, 0);
+    const isExactMatch = rateDate.getTime() === requestedDate.getTime();
+
+    const response = {
+      success: true,
+      data: {
+        name: rate.name,
+        type: rate.type,
+        requestedDate: date,
+        actualDate: rate.date.toISOString().split('T')[0],
+        buyPrice: rate.buyPrice,
+        sellPrice: rate.sellPrice,
+        isExactMatch
+      }
+    };
+
+    if (!isExactMatch) {
+      response.data.message = 'Belirtilen tarihte veri bulunamadı. En yakın tarih kullanıldı.';
+    }
+
+    res.status(200).json(response);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Sunucu hatası' 
+    });
+  }
+};
+
 // Tüm fiyatları getirme
 exports.getRates = async (req, res) => {
   try {
@@ -62,6 +142,7 @@ console.log(req.query);
       const latestRate = await Rate.findOne(query).sort({ date: -1 });
       if (latestRate) {
         const latestDate = latestRate.date;
+        console.log('📅 En son tarihli kayıt:', latestDate.toISOString().split('T')[0]);
 
         // En son tarihin başlangıcını ve sonunu belirleyelim
         const startOfDay = new Date(latestDate);
@@ -74,6 +155,7 @@ console.log(req.query);
         query.date = { $gte: startOfDay, $lte: endOfDay };
       } else {
         // Hiç kayıt yoksa boş sonuç döndürelim
+        console.log('⚠️ Hiç kayıt bulunamadı');
         return res.status(200).json({
           success: true,
           count: 0,

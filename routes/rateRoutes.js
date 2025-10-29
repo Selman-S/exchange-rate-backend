@@ -4,7 +4,8 @@ const express = require('express');
 const router = express.Router();
 const {
     getRates,
-    getAssetNamesByType, // Yeni eklenen fonksiyon
+    getAssetNamesByType,
+    getPriceAtDate, // Yeni eklenen fonksiyon
   } = require('../controllers/rateController');
 
 /**
@@ -97,5 +98,67 @@ router.get('/', getRates);
  *                     type: string
  */
 router.get('/names', getAssetNamesByType);
+
+/**
+ * @swagger
+ * /api/rates/price-at:
+ *   get:
+ *     summary: Belirli bir tarihteki fiyatı getirir
+ *     tags: [Rates]
+ *     parameters:
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: 'Varlık türü (gold veya currency)'
+ *       - in: query
+ *         name: name
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: 'Varlık adı (örn: Amerikan Doları)'
+ *       - in: query
+ *         name: date
+ *         schema:
+ *           type: string
+ *           format: date
+ *         required: true
+ *         description: 'Tarih (YYYY-MM-DD formatında)'
+ *     responses:
+ *       200:
+ *         description: Başarılı işlem
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                     type:
+ *                       type: string
+ *                     requestedDate:
+ *                       type: string
+ *                     actualDate:
+ *                       type: string
+ *                     buyPrice:
+ *                       type: number
+ *                     sellPrice:
+ *                       type: number
+ *                     isExactMatch:
+ *                       type: boolean
+ *                     message:
+ *                       type: string
+ *       400:
+ *         description: Geçersiz parametreler
+ *       404:
+ *         description: Veri bulunamadı
+ */
+router.get('/price-at', getPriceAtDate);
 
 module.exports = router;

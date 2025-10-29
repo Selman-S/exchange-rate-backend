@@ -6,6 +6,8 @@ const {
   getPortfolio,
   updatePortfolio,
   deletePortfolio,
+  getPortfolioSummary,
+  getPortfolioValueSeries,
 } = require('../controllers/portfolioController');
 
 const { protect } = require('../middleware/auth');
@@ -172,5 +174,105 @@ router
   .get(getPortfolio)
   .put(updatePortfolio)
   .delete(deletePortfolio);
+
+/**
+ * @swagger
+ * /api/portfolios/{id}/summary:
+ *   get:
+ *     summary: Portföy özetini getirir (toplam değer, kar/zarar)
+ *     tags: [Portfolios]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Portföy ID'si
+ *     responses:
+ *       200:
+ *         description: Başarılı işlem
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     portfolioId:
+ *                       type: string
+ *                     portfolioName:
+ *                       type: string
+ *                     totalCost:
+ *                       type: number
+ *                     totalValue:
+ *                       type: number
+ *                     pnl:
+ *                       type: number
+ *                     pnlPercent:
+ *                       type: number
+ *                     assetCount:
+ *                       type: integer
+ *                     lastUpdated:
+ *                       type: string
+ *                       format: date-time
+ *       404:
+ *         description: Portföy bulunamadı
+ */
+router.get('/:id/summary', getPortfolioSummary);
+
+/**
+ * @swagger
+ * /api/portfolios/{id}/value-series:
+ *   get:
+ *     summary: Portföyün tarihsel değer serisini getirir
+ *     tags: [Portfolios]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Portföy ID'si
+ *       - in: query
+ *         name: period
+ *         schema:
+ *           type: string
+ *           enum: [1W, 1M, 3M, 6M, 1Y, 3Y, ALL]
+ *         description: Zaman aralığı - 1W(1 hafta), 1M(1 ay), 3M(3 ay), 6M(6 ay/varsayılan), 1Y(1 yıl), 3Y(3 yıl), ALL(tümü)
+ *     responses:
+ *       200:
+ *         description: Başarılı işlem
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 count:
+ *                   type: integer
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       date:
+ *                         type: string
+ *                         format: date
+ *                       value:
+ *                         type: number
+ *                       change:
+ *                         type: number
+ *       404:
+ *         description: Portföy bulunamadı
+ */
+router.get('/:id/value-series', getPortfolioValueSeries);
 
 module.exports = router;

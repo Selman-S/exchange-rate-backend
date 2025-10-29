@@ -7,7 +7,7 @@ const Rate = require('../models/Rate');
 // Yeni bir varlık oluşturma
 exports.createAsset = async (req, res) => {
   try {
-    const { type, name, amount } = req.body;
+    const { type, name, amount, costPrice, purchaseDate } = req.body;
     const portfolioId = req.params.portfolioId;
 
     // Portföyü kontrol et
@@ -23,15 +23,36 @@ exports.createAsset = async (req, res) => {
       });
     }
 
-    // Güncel fiyatı al
-    const latestRate = await Rate.findOne({ type, name })
-      .sort({ date: -1 });
+    // purchaseDate belirleme (verilmemişse bugün)
+    const finalPurchaseDate = purchaseDate ? new Date(purchaseDate) : new Date();
 
-    if (!latestRate) {
-      return res.status(404).json({
+    // Gelecek tarih kontrolü
+    if (finalPurchaseDate > new Date()) {
+      return res.status(400).json({
         success: false,
-        error: 'Güncel fiyat bulunamadı',
+        error: 'Gelecek tarihli işlem eklenemez',
       });
+    }
+
+    // costPrice belirleme
+    let finalCostPrice = costPrice;
+
+    // Eğer costPrice verilmemişse, purchaseDate'teki fiyatı bul
+    if (!finalCostPrice) {
+      const historicalRate = await Rate.findOne({
+        type,
+        name,
+        date: { $lte: finalPurchaseDate }
+      }).sort({ date: -1 });
+
+      if (!historicalRate) {
+        return res.status(404).json({
+          success: false,
+          error: 'Belirtilen tarih için fiyat bulunamadı',
+        });
+      }
+
+      finalCostPrice = historicalRate.sellPrice;
     }
 
     // Yeni varlık oluştur
@@ -40,8 +61,8 @@ exports.createAsset = async (req, res) => {
       type,
       name,
       amount,
-      costPrice: latestRate.sellPrice, // Maliyet fiyatı satış fiyatına göre
-      purchaseDate: new Date(),
+      costPrice: finalCostPrice,
+      purchaseDate: finalPurchaseDate,
     });
 
     res.status(201).json({

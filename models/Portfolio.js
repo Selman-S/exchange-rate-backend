@@ -10,6 +10,14 @@ const PortfolioSchema = new mongoose.Schema(
     name: {
       type: String,
       required: [true, 'Portföy adı gereklidir'],
+      trim: true,
+      minlength: [3, 'Portföy adı en az 3 karakter olmalıdır'],
+      maxlength: [40, 'Portföy adı en fazla 40 karakter olabilir'],
+    },
+    description: {
+      type: String,
+      trim: true,
+      maxlength: [200, 'Açıklama en fazla 200 karakter olabilir'],
     },
     createdAt: {
       type: Date,
