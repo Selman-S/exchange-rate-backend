@@ -3,6 +3,7 @@
 const Asset = require('../models/Asset');
 const Portfolio = require('../models/Portfolio');
 const Rate = require('../models/Rate');
+const Transaction = require('../models/Transaction');
 
 // Yeni bir varlık oluşturma
 exports.createAsset = async (req, res) => {
@@ -64,6 +65,27 @@ exports.createAsset = async (req, res) => {
       costPrice: finalCostPrice,
       purchaseDate: finalPurchaseDate,
     });
+
+    // İşlem kaydı oluştur (Transaction)
+    try {
+      await Transaction.create({
+        portfolio: portfolioId,
+        asset: asset._id,
+        side: 'BUY',
+        assetType: type,
+        assetName: name,
+        amount,
+        price: finalCostPrice,
+        totalValue: amount * finalCostPrice,
+        date: finalPurchaseDate,
+        note: 'Varlık ekleme',
+        priceMode: costPrice ? 'MANUAL' : 'AUTO'
+      });
+      console.log(`📝 Transaction kaydı oluşturuldu: BUY ${amount} ${name}`);
+    } catch (transactionError) {
+      console.error('⚠️ Transaction kaydı oluşturulamadı:', transactionError.message);
+      // Transaction hatası asset oluşturulmasını engellemesin
+    }
 
     res.status(201).json({
       success: true,

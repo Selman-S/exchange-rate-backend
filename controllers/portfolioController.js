@@ -288,7 +288,7 @@ exports.deletePortfolio = async (req, res) => {
 exports.getPortfolioValueSeries = async (req, res) => {
   try {
     const portfolioId = req.params.id;
-    const { period = '6M' } = req.query; // 1M, 3M, 6M, 1Y, ALL
+    const { period = '6M', startDate: customStartDate, endDate: customEndDate } = req.query;
 
     // Portföy kontrolü
     const portfolio = await Portfolio.findOne({
@@ -309,48 +309,66 @@ exports.getPortfolioValueSeries = async (req, res) => {
     if (assets.length === 0) {
       return res.status(200).json({
         success: true,
+        count: 0,
         data: [],
       });
     }
 
     // Tarih aralığını belirle
-    const endDate = new Date();
-    const startDate = new Date();
+    let endDate = new Date();
+    let startDate = new Date();
     let intervalType = 'monthly'; // 'daily', 'weekly', 'monthly'
     
-    switch (period) {
-      case '1W':
-        startDate.setDate(startDate.getDate() - 7);
+    if (period === 'CUSTOM' && customStartDate && customEndDate) {
+      // Custom date range
+      startDate = new Date(customStartDate);
+      endDate = new Date(customEndDate);
+      
+      // Interval type'ı tarih aralığına göre belirle
+      const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+      if (daysDiff <= 30) {
         intervalType = 'daily';
-        break;
-      case '1M':
-        startDate.setMonth(startDate.getMonth() - 1);
-        intervalType = 'daily';
-        break;
-      case '3M':
-        startDate.setMonth(startDate.getMonth() - 3);
+      } else if (daysDiff <= 90) {
         intervalType = 'weekly';
-        break;
-      case '6M':
-        startDate.setMonth(startDate.getMonth() - 6);
+      } else {
         intervalType = 'monthly';
-        break;
-      case '1Y':
-        startDate.setFullYear(startDate.getFullYear() - 1);
-        intervalType = 'monthly';
-        break;
-      case '3Y':
-        startDate.setFullYear(startDate.getFullYear() - 3);
-        intervalType = 'monthly';
-        break;
-      case 'ALL':
-        // En eski asset'in purchase date'ini kullan
-        startDate.setTime(assets[0].purchaseDate.getTime());
-        intervalType = 'monthly';
-        break;
-      default:
-        startDate.setMonth(startDate.getMonth() - 6);
-        intervalType = 'monthly';
+      }
+    } else {
+      // Preset periods
+      switch (period) {
+        case '1W':
+          startDate.setDate(startDate.getDate() - 7);
+          intervalType = 'daily';
+          break;
+        case '1M':
+          startDate.setMonth(startDate.getMonth() - 1);
+          intervalType = 'daily';
+          break;
+        case '3M':
+          startDate.setMonth(startDate.getMonth() - 3);
+          intervalType = 'weekly';
+          break;
+        case '6M':
+          startDate.setMonth(startDate.getMonth() - 6);
+          intervalType = 'monthly';
+          break;
+        case '1Y':
+          startDate.setFullYear(startDate.getFullYear() - 1);
+          intervalType = 'monthly';
+          break;
+        case '3Y':
+          startDate.setFullYear(startDate.getFullYear() - 3);
+          intervalType = 'monthly';
+          break;
+        case 'ALL':
+          // En eski asset'in purchase date'ini kullan
+          startDate.setTime(assets[0].purchaseDate.getTime());
+          intervalType = 'monthly';
+          break;
+        default:
+          startDate.setMonth(startDate.getMonth() - 6);
+          intervalType = 'monthly';
+      }
     }
 
     console.log(`📈 Value Series [${period}/${intervalType}]: ${startDate.toISOString().split('T')[0]} → ${endDate.toISOString().split('T')[0]}`);
@@ -425,8 +443,7 @@ exports.getPortfolioValueSeries = async (req, res) => {
       dataPoints[0].change = 0;
     }
 
-    console.log(`✅ ${dataPoints.length} veri noktası oluşturuldu`);
-
+    
     res.status(200).json({
       success: true,
       count: dataPoints.length,

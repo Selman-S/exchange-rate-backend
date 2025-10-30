@@ -14,12 +14,16 @@ const { protect } = require('../middleware/auth');
 
 // Portföy varlıklarıyla ilgili rotaları içe aktar
 const assetRouter = require('./assetRoutes');
+const transactionRouter = require('./transactionRoutes');
 
 // Rota koruması ekleyin
 router.use(protect);
 
 // Portföy varlıkları için yönlendirme
 router.use('/:portfolioId/assets', assetRouter);
+
+// Portföy işlemleri için yönlendirme
+router.use('/:portfolioId/transactions', transactionRouter);
 
 /**
  * @swagger

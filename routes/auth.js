@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { register, login,getMe } = require('../controllers/authController');
+const { register, login, getMe, changePassword, changeEmail } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
 /**
@@ -98,5 +98,61 @@ router.post('/login', login);
 
 
 router.get('/me', protect, getMe);
+
+/**
+ * @swagger
+ * /api/auth/change-password:
+ *   put:
+ *     summary: Şifre değiştir
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - currentPassword
+ *               - newPassword
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Şifre başarıyla değiştirildi
+ */
+router.put('/change-password', protect, changePassword);
+
+/**
+ * @swagger
+ * /api/auth/change-email:
+ *   put:
+ *     summary: Email değiştir
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - newEmail
+ *               - password
+ *             properties:
+ *               newEmail:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Email başarıyla değiştirildi
+ */
+router.put('/change-email', protect, changeEmail);
 
 module.exports = router;
