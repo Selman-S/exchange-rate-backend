@@ -5,7 +5,11 @@ const router = express.Router();
 const {
     getRates,
     getAssetNamesByType,
-    getPriceAtDate, // Yeni eklenen fonksiyon
+    getPriceAtDate,
+    getHourlyRates,
+    getPriceChange,
+    getComparisonData,
+    calculateReturn,
   } = require('../controllers/rateController');
 
 /**
@@ -160,5 +164,187 @@ router.get('/names', getAssetNamesByType);
  *         description: Veri bulunamadı
  */
 router.get('/price-at', getPriceAtDate);
+
+/**
+ * @swagger
+ * /api/rates/hourly:
+ *   get:
+ *     summary: Saatlik veri getirir (bugün veya belirli bir gün)
+ *     tags: [Rates]
+ *     parameters:
+ *       - in: query
+ *         name: date
+ *         schema:
+ *           type: string
+ *           format: date
+ *         required: false
+ *         description: 'Tarih (YYYY-MM-DD formatında, default: bugün)'
+ *     responses:
+ *       200:
+ *         description: Başarılı işlem
+ */
+router.get('/hourly', getHourlyRates);
+
+/**
+ * @swagger
+ * /api/rates/change:
+ *   get:
+ *     summary: Haftalık/Aylık değişim hesapla
+ *     tags: [Rates]
+ *     parameters:
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: 'Varlık türü (gold veya currency)'
+ *       - in: query
+ *         name: name
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: 'Varlık adı'
+ *       - in: query
+ *         name: period
+ *         schema:
+ *           type: string
+ *           enum: [daily, weekly, monthly, yearly, 1d, 1w, 1m, 1y]
+ *         required: true
+ *         description: 'Dönem'
+ *     responses:
+ *       200:
+ *         description: Başarılı işlem
+ */
+router.get('/change', getPriceChange);
+
+/**
+ * @swagger
+ * /api/rates/comparison:
+ *   get:
+ *     summary: Karşılaştırma grafiği için veri
+ *     tags: [Rates]
+ *     parameters:
+ *       - in: query
+ *         name: assets
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: 'Varlıklar (currency-Dolar,gold-Gram Altın)'
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date
+ *         required: true
+ *         description: 'Başlangıç tarihi'
+ *       - in: query
+ *         name: to
+ *         schema:
+ *           type: string
+ *           format: date
+ *         required: true
+ *         description: 'Bitiş tarihi'
+ *       - in: query
+ *         name: normalize
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
+ *         required: false
+ *         description: 'Normalize et (100 bazlı)'
+ *     responses:
+ *       200:
+ *         description: Başarılı işlem
+ */
+router.get('/comparison', getComparisonData);
+
+/**
+ * @swagger
+ * /api/rates/calculate-return:
+ *   post:
+ *     summary: Getiri hesaplama simülatörü
+ *     tags: [Rates]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - assetType
+ *               - assetName
+ *               - amount
+ *               - investmentDate
+ *             properties:
+ *               assetType:
+ *                 type: string
+ *                 enum: [gold, currency]
+ *               assetName:
+ *                 type: string
+ *               amount:
+ *                 type: number
+ *               investmentDate:
+ *                 type: string
+ *                 format: date
+ *               comparisonDate:
+ *                 type: string
+ *                 format: date
+ *     responses:
+ *       200:
+ *         description: Başarılı işlem
+ */
+router.post('/calculate-return', calculateReturn);
+
+/**
+ * @swagger
+ * /api/rates/hourly:
+ *   get:
+ *     summary: Saatlik fiyat verilerini getirir
+ *     tags: [Rates]
+ *     parameters:
+ *       - in: query
+ *         name: date
+ *         schema:
+ *           type: string
+ *           format: date
+ *         required: false
+ *         description: 'Tarih (YYYY-MM-DD). Default: bugün'
+ *     responses:
+ *       200:
+ *         description: Başarılı işlem
+ */
+router.get('/hourly', getHourlyRates);
+
+/**
+ * @swagger
+ * /api/rates/change:
+ *   get:
+ *     summary: Fiyat değişim yüzdesini getirir (günlük/haftalık/aylık/yıllık)
+ *     tags: [Rates]
+ *     parameters:
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [gold, currency]
+ *         required: true
+ *         description: 'Varlık türü'
+ *       - in: query
+ *         name: name
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: 'Varlık adı'
+ *       - in: query
+ *         name: period
+ *         schema:
+ *           type: string
+ *           enum: [daily, weekly, monthly, yearly]
+ *         required: true
+ *         description: 'Zaman aralığı'
+ *     responses:
+ *       200:
+ *         description: Başarılı işlem
+ */
+router.get('/change', getPriceChange);
 
 module.exports = router;

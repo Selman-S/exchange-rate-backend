@@ -91,13 +91,14 @@ const parseAndSaveData = async (html, type) => {
     rates.push(rate);
   });
 
-  // Bugünün başlangıcı ve sonunu Türkiye saat diliminde belirleme
-  const todayStart = moment().tz('Europe/Istanbul').startOf('day').toDate();
-  const todayEnd = moment().tz('Europe/Istanbul').endOf('day').toDate();
+  // Bugünkü SAATİN başlangıcı ve sonu (Saatlik kayıt için)
+  const currentHourStart = moment().tz('Europe/Istanbul').startOf('hour').toDate();
+  const currentHourEnd = moment().tz('Europe/Istanbul').endOf('hour').toDate();
 
   // Veritabanına kaydetme (bulkWrite kullanarak)
   if (rates.length > 0) {
     console.log(`\n📊 ${type.toUpperCase()} - Toplam ${rates.length} veri çekildi:`);
+    console.log(`⏰ Saat: ${moment().tz('Europe/Istanbul').format('HH:mm')}`);
     // İlk 3 veriyi örnek olarak göster
     rates.slice(0, 3).forEach(rate => {
       console.log(`  • ${rate.name}: Alış=${rate.buyPrice.toFixed(2)} TL, Satış=${rate.sellPrice.toFixed(2)} TL`);
@@ -106,21 +107,22 @@ const parseAndSaveData = async (html, type) => {
       console.log(`  ... ve ${rates.length - 3} veri daha`);
     }
 
+    // BUGÜN İÇİN SAATLİK KAYIT (Her saat için ayrı kayıt)
     const bulkOps = rates.map((rate) => ({
       updateOne: {
         filter: {
           type: rate.type,
           name: rate.name,
-          date: { $gte: todayStart, $lte: todayEnd },
+          date: { $gte: currentHourStart, $lte: currentHourEnd }, // Bu saate ait kayıt var mı?
         },
         update: {
           $set: {
             buyPrice: rate.buyPrice,
             sellPrice: rate.sellPrice,
-            date: rate.date,
+            date: rate.date, // Tam saat bilgisiyle kaydediyoruz
           },
         },
-        upsert: true, // Kayıt yoksa oluştur
+        upsert: true, // Bu saat için kayıt yoksa oluştur
       },
     }));
 
@@ -194,4 +196,119 @@ const fetchRates = async () => {
   }
 };
 
+// Bugünün eksik saatlerini doldur (ilk başlangıçta)
+const backfillTodayHours = async () => {
+  try {
+    const now = moment().tz('Europe/Istanbul');
+    const todayStart = moment().tz('Europe/Istanbul').startOf('day');
+    const currentHour = now.hour();
+    
+    console.log('\n🔄 Bugünün eksik saatleri kontrol ediliyor...');
+    console.log(`📅 Tarih: ${now.format('DD.MM.YYYY')}`);
+    console.log(`⏰ Mevcut saat: ${currentHour}:00\n`);
+    
+    // 00:00'dan şu ana kadar her saat için kontrol et (24 saat)
+    const startHour = 0; // Gece yarısından başla
+    const endHour = currentHour; // Şu anki saate kadar
+    
+    let filledCount = 0;
+    
+    for (let hour = startHour; hour <= endHour; hour++) {
+      // Bu saate ait kayıt var mı kontrol et
+      const hourStart = moment().tz('Europe/Istanbul').hour(hour).minute(0).second(0).toDate();
+      const hourEnd = moment().tz('Europe/Istanbul').hour(hour).minute(59).second(59).toDate();
+      
+      const existingCount = await Rate.countDocuments({
+        date: { $gte: hourStart, $lte: hourEnd }
+      });
+      
+      if (existingCount === 0) {
+        console.log(`⏰ ${hour}:00 için veri yok, çekiliyor...`);
+        
+        // Veriyi çek ve kaydet (mevcut API'den)
+        try {
+          const goldResponse = await axios.get(process.env.GOLD_URL);
+          const currencyResponse = await axios.get(process.env.CURRENCY_URL);
+          
+          // Parse ve kaydet (date'i o saate ayarlayarak)
+          const goldData = await parseAndSaveDataForHour(goldResponse.data, 'gold', hour);
+          const currencyData = await parseAndSaveDataForHour(currencyResponse.data, 'currency', hour);
+          
+          filledCount++;
+          console.log(`✅ ${hour}:00 verisi kaydedildi`);
+        } catch (err) {
+          console.error(`❌ ${hour}:00 verisi çekilirken hata:`, err.message);
+        }
+      }
+    }
+    
+    if (filledCount > 0) {
+      console.log(`\n🎉 Toplam ${filledCount} saat verisi dolduruldu!`);
+    } else {
+      console.log('\n✅ Tüm saatler zaten mevcut, backfill gerekmiyor.');
+    }
+    console.log('========================================\n');
+  } catch (err) {
+    console.error('❌ Backfill hatası:', err.message);
+  }
+};
+
+// Belirli bir saat için veri parse ve kaydet
+const parseAndSaveDataForHour = async (html, type, hour) => {
+  const $ = cheerio.load(html);
+  const rates = [];
+
+  $('.table tbody tr').each((index, element) => {
+    let name;
+    if (type === 'gold') {
+      name = $(element).find('td:nth-child(1)').text().trim();
+    } else if (type === 'currency') {
+      name = $(element).find('td:nth-child(1) h5').text().trim();
+    }
+    if (name === '') {
+      return;
+    }
+
+    const buyPrice = parseTL($(element).find('[id$="Buy"]').text());
+    const sellPrice = parseTL($(element).find('[id$="Sell"]').text());
+
+    if (buyPrice === null || sellPrice === null) {
+      return;
+    }
+
+    // Belirtilen saate göre tarih oluştur
+    const dateForHour = moment()
+      .tz('Europe/Istanbul')
+      .hour(hour)
+      .minute(0)
+      .second(0)
+      .toDate();
+
+    const rate = {
+      type,
+      name,
+      buyPrice,
+      sellPrice,
+      date: dateForHour,
+    };
+    rates.push(rate);
+  });
+
+  // Kaydet
+  if (rates.length > 0) {
+    const bulkOps = rates.map((rate) => ({
+      insertOne: {
+        document: rate
+      }
+    }));
+
+    try {
+      await Rate.bulkWrite(bulkOps);
+    } catch (err) {
+      console.error(`Backfill kayıt hatası (${type}):`, err.message);
+    }
+  }
+};
+
 module.exports = fetchRates;
+module.exports.backfillTodayHours = backfillTodayHours;

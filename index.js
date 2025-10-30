@@ -8,6 +8,8 @@ const swaggerDocs = require('./swagger');
 const authRoutes = require('./routes/auth');
 const portfolioRoutes = require('./routes/portfolioRoutes');
 const rateRoutes = require('./routes/rateRoutes');
+const favoriteRoutes = require('./routes/favoriteRoutes');
+const alertRoutes = require('./routes/alertRoutes');
 const {
   fetchHistoricalGoldRates
 }= require('./services/fetchHistoricalGold');
@@ -15,6 +17,9 @@ const {
   fetchHistoricalCurrencyRates
 }= require('./services/fetchHistoricalCurrency');
 const fetchRates = require('./services/fetchRates');
+const { backfillTodayHours } = require('./services/fetchRates');
+const { checkAlerts } = require('./controllers/alertController');
+const consolidatePreviousDay = require('./services/consolidatePreviousDay');
 
 
 //  fetchHistoricalGoldRates()
@@ -50,7 +55,12 @@ app.use(cors(corsOptions));
 // Veritabanı Bağlantısı
 mongoose
 .connect(process.env.MONGODB_URI)
-.then(() => console.log('MongoDB bağlantısı başarılı'))
+.then(() => {
+  console.log('MongoDB bağlantısı başarılı');
+  
+  // İlk başlangıçta bugünün eksik saatlerini doldur
+  backfillTodayHours();
+})
 .catch((err) => console.error('MongoDB bağlantı hatası:', err));
 
 // Swagger dokümantasyonu
@@ -71,6 +81,24 @@ cron.schedule('0 * * * *', () => {
   timezone: "Europe/Istanbul"
 });
 
+// Alarm kontrolü - Her 15 dakikada bir (24/7)
+cron.schedule('*/15 * * * *', () => {
+  console.log('🔔 Alarm kontrolü başlatıldı:', new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' }));
+  checkAlerts();
+},{
+  scheduled: true,
+  timezone: "Europe/Istanbul"
+});
+
+// Önceki günü birleştirme - Her gece 00:01'de
+cron.schedule('1 0 * * *', () => {
+  console.log('🌙 Gece yarısı: Önceki gün birleştiriliyor...');
+  consolidatePreviousDay();
+},{
+  scheduled: true,
+  timezone: "Europe/Istanbul"
+});
+
 
 
 
@@ -78,6 +106,8 @@ cron.schedule('0 * * * *', () => {
 app.use('/api/auth', authRoutes);
 app.use('/api/portfolios', portfolioRoutes);
 app.use('/api/rates', rateRoutes);
+app.use('/api/favorites', favoriteRoutes);
+app.use('/api/alerts', alertRoutes);
 // app.use('/api/assets', assetRoutes); // Asset rotaları portföy rotalarına dahil edildi
 
 app.get('/', (req, res) => {
